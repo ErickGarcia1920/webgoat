@@ -4,9 +4,7 @@
  */
 package org.dummy.insecure.framework;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -41,10 +39,19 @@ public class VulnerableTaskHolder implements Serializable {
   }
 
   /**
-   * Execute a task when de-serializing a saved or received object.
+   * Safely de-serialize a saved or received object using ObjectInputFilter
+   * and removing dynamic OS command execution.
    */
-  private void readObject(ObjectInputStream stream) throws Exception {
-    // unserialize data so taskName and taskAction are available
+  private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
+    // Fix 1: Apply JVM Class Filter (Allowlist safe classes, reject all others)
+    // Only allow LocalDateTime, String, and VulnerableTaskHolder
+    java.io.ObjectInputFilter filter =
+        java.io.ObjectInputFilter.Config.createFilter(
+            "java.time.LocalDateTime;java.lang.String;org.dummy.insecure.framework.VulnerableTaskHolder;!*");
+    stream.setObjectInputFilter(filter);
+
+    // Fix 2: Safely restore serialized fields (throws InvalidClassException if object stream
+    // contains unauthorized classes)
     stream.defaultReadObject();
 
     // do something with the data
@@ -54,25 +61,13 @@ public class VulnerableTaskHolder implements Serializable {
     if (requestedExecutionTime != null
         && (requestedExecutionTime.isBefore(LocalDateTime.now().minusMinutes(10))
             || requestedExecutionTime.isAfter(LocalDateTime.now()))) {
-      // do nothing is the time is not within 10 minutes after the object has been created
+      // do nothing if the time is not within 10 minutes after the object has been created
       log.debug(this.toString());
       throw new IllegalArgumentException("outdated");
     }
 
-    // condition is here to prevent you from destroying the goat altogether
-    if ((taskAction.startsWith("sleep") || taskAction.startsWith("ping"))
-        && taskAction.length() < 22) {
-      log.info("about to execute: {}", taskAction);
-      try {
-        Process p = Runtime.getRuntime().exec(taskAction);
-        BufferedReader in = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line = null;
-        while ((line = in.readLine()) != null) {
-          log.info(line);
-        }
-      } catch (IOException e) {
-        log.error("IO Exception", e);
-      }
-    }
+    // Fix 3: Layer 1 Mitigation (Sink Removal): Removed Runtime.getRuntime().exec() entirely.
+    // Untrusted strings restored from a stream are never passed directly to OS execution sinks.
+    log.info("Task '{}' validated and queued safely without process execution.", taskName);
   }
 }
