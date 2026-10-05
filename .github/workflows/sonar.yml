@@ -34,4 +34,4 @@ jobs:
       - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: mvn -B -DskipTests -Dspotless.check.skip=true package org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=erickgarcia1920_webgoat-sonar
+        run: mvn -B -DskipTests -Dspotless.check.skip=true package org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=erickgarcia1920_webgoat-sonar -Dsonar.organization=erickgarcia1920
